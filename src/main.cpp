@@ -72,16 +72,16 @@ int NextWaypoint(double x, double y, double theta, const vector<double> &maps_x,
 	double heading = atan2((map_y-y),(map_x-x));
 
 	double angle = fabs(theta-heading);
-  angle = min(2*pi() - angle, angle);
+    angle = min(2*pi() - angle, angle);
 
-  if(angle > pi()/4)
-  {
-    closestWaypoint++;
-  if (closestWaypoint == maps_x.size())
-  {
-    closestWaypoint = 0;
-  }
-  }
+    if(angle > pi()/4)
+    {
+        closestWaypoint++;
+        if (closestWaypoint == maps_x.size())
+        {
+            closestWaypoint = 0;
+        }
+    }
 
   return closestWaypoint;
 }
@@ -180,25 +180,26 @@ int main() {
 
   ifstream in_map_(map_file_.c_str(), ifstream::in);
 
-  string line;
-  while (getline(in_map_, line)) {
-  	istringstream iss(line);
-  	double x;
-  	double y;
-  	float s;
-  	float d_x;
-  	float d_y;
-  	iss >> x;
-  	iss >> y;
-  	iss >> s;
-  	iss >> d_x;
-  	iss >> d_y;
-  	map_waypoints_x.push_back(x);
-  	map_waypoints_y.push_back(y);
-  	map_waypoints_s.push_back(s);
-  	map_waypoints_dx.push_back(d_x);
-  	map_waypoints_dy.push_back(d_y);
-  }
+    string line;
+    while (getline(in_map_, line)) 
+    {
+        istringstream iss(line);
+        double x;
+        double y;
+        float s;
+        float d_x;
+        float d_y;
+        iss >> x;
+        iss >> y;
+        iss >> s;
+        iss >> d_x;
+        iss >> d_y;
+        map_waypoints_x.push_back(x);
+        map_waypoints_y.push_back(y);
+        map_waypoints_s.push_back(s);
+        map_waypoints_dx.push_back(d_x);
+        map_waypoints_dy.push_back(d_y);
+    }
 
   h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
@@ -241,6 +242,33 @@ int main() {
 
           	vector<double> next_x_vals;
           	vector<double> next_y_vals;
+
+            double dist_inc = 0.5;
+
+            // Constant direction and speed
+            /*
+            for (int i = 0; i < 50; i++)
+            {
+                next_x_vals.push_back(car_x + (dist_inc*i)*cos(deg2rad(car_yaw)));
+                next_y_vals.push_back(car_y + (dist_inc*i)*sin(deg2rad(car_yaw)));
+            }
+
+            */
+
+            // Constant lane and speed
+            for (int i = 0; i < 50; i++)
+            {
+
+                double next_d = 6; // constant
+
+                double next_s = car_s + (i + 1)*dist_inc; 
+
+                vector<double> xy = getXY(next_s, next_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+                next_x_vals.push_back(xy[0]);
+                next_y_vals.push_back(xy[1]);
+
+
+            }
 
 
           	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
