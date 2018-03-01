@@ -287,6 +287,13 @@ int main() {
             bool front_left_detected;
             bool behind_left_detected;
 
+
+            int count_front_right = 0;
+            int count_front_left = 0;
+                
+            int count_behind_right = 0;
+            int count_behind_left = 0;
+
             if (count > 32000)
                     count = 0;
 
@@ -302,7 +309,7 @@ int main() {
                 {
                     
                     check_car_s += ((double)prev_size*0.02*check_speed);
-                    if ((check_car_s > car_s) && ((check_car_s - car_s) < 15))
+                    if ((check_car_s > car_s) && ((check_car_s - car_s) < 18))
                     {
                         //reference_veloc = 30.0;
                         //reference_veloc = sqrt(vx*vx + vy*vy);
@@ -323,11 +330,13 @@ int main() {
                     {
                         if ((check_car_s > car_s) && ((check_car_s - car_s) < 30))
                         {
-                            front_right_detected =  true;
+                            //front_right_detected =  true;
+                            count_front_right += 1;
                         }
-                        else if ((check_car_s < car_s) && ((car_s - check_car_s) > 5) && (check_speed > car_speed) )
+                        else if ((check_car_s < car_s) && ((car_s - check_car_s) > 2) && (check_speed > car_speed) )
                         {
-                            behind_right_detected =  true;
+                            //behind_right_detected =  true;
+                            count_behind_right += 1;
                         }
                     }
 
@@ -340,11 +349,13 @@ int main() {
                     {
                         if ((check_car_s > car_s) && ((check_car_s - car_s) < 30))
                         {
-                            front_left_detected =  true;
+                            //front_left_detected =  true;
+                            count_front_left += 1;
                         }
-                        else if ((check_car_s < car_s) && ((car_s - check_car_s) > 5) && (check_speed > car_speed) )
+                        else if ((check_car_s < car_s) && ((car_s - check_car_s) > 2) && (check_speed > car_speed) )
                         {
-                            behind_left_detected =  true;
+                            //behind_left_detected =  true;
+                            count_behind_left += 1;
                         }
                     }
                 }
@@ -398,30 +409,36 @@ int main() {
             // Change Lane
             if (seek_on && count > 200)
             {
-                if (lane == 0 && right_lane_free == true)
+                if (lane == 0)
                 {
-                    lane = 1;
-                    seek_on = false;
-
+                    if(count_behind_right == 0 && count_front_right == 0)
+                    {
+                        lane = 1;
+                        seek_on = false;
+                    }
                 }
                 else if (lane == 1)        
                 {
-                    if (left_lane_free == true)
-                    {
-                        lane = 0;
-                        seek_on = false;
-                    }
-                    else if (right_lane_free == true)
+                    if (count_behind_right == 0 && count_front_right == 0)
                     {
                         lane = 2;
                         seek_on = false;
                     }
+                    else if (count_behind_left == 0 && count_front_left == 0)
+                    {
+                        lane = 0;
+                        seek_on = false;
+                    }
                 }
-                else if (lane == 2 && left_lane_free == true)
+                else if (lane == 2)
                 {
-                    lane = 1;
-                    seek_on = false;
+                    if (count_behind_left == 0 && count_front_left == 0)
+                    {
+                        lane = 1;
+                        seek_on = false;
+                    }
                 }
+                count = 0;
             }
             
                 
