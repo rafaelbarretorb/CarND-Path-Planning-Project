@@ -221,9 +221,13 @@ int main() {
 
     bool car_front_of_me = false;
     int attempt = 0;
+    const int POINTS = 35;
+    const double max_ref_vel = 49.5;
+    const double max_acc = 0.4;
+    const double acc = 0.2;
 
 
-  h.onMessage([&attempt, &car_front_of_me , &state, &count, &ref_vel,&lane, &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+  h.onMessage([&acc, &max_acc, &max_ref_vel, &POINTS, &attempt, &car_front_of_me , &state, &count, &ref_vel,&lane, &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -248,7 +252,7 @@ int main() {
           	double car_s = j[1]["s"];
           	double car_d = j[1]["d"];
           	double car_yaw = j[1]["yaw"];
-          	double car_speed = j[1]["speed"];
+          	double car_speed = j[1]["speed"]; // mph
 
           	// Previous path data given to the Planner
           	auto previous_path_x = j[1]["previous_path_x"];
@@ -305,6 +309,11 @@ int main() {
             int count_behind_left = 0;
 
 
+            double safe_distance = 2 + car_speed/2.24; // 
+            //cout << "\nsafe_distance" << safe_distance<< endl;
+
+
+
             //cout << "cars detected number:  " << sensor_fusion.size() << endl;
             for(int i = 0; i < sensor_fusion.size(); i++)
             {
@@ -320,14 +329,15 @@ int main() {
                 // Check car in front of me
                 if ((d < (2 + 4*lane + 2)) && (d > (2 + 4*lane - 2)))
                 {
-                    if ((check_car_s > car_s) && ((check_car_s - car_s) < 25))
+                    if ((check_car_s > car_s) && ((check_car_s - car_s) < 35))
                     {
-                        too_close = true;
-                        seek_on = true;
-                        //id_car_seek = i;
-                        new_ref_vel = check_speed;
-                        //change_lane = true;
                         car_front_of_me = true;
+                        id_car_seek = i;
+                    }
+
+                    if ((check_car_s > car_s) && ((check_car_s - car_s) < safe_distance))
+                    {
+                        too_close = true;                        
                     }
                 }
 
@@ -336,13 +346,18 @@ int main() {
                 {
                     if ((d < (2 + 4*(lane + 1) + 2)) && (d > (2 + 4*(lane + 1) - 2)))
                     {
+                        if ((check_car_s > car_s) && ((check_car_s - car_s) < 150))
+                        {
+                            count_front_right += 1;
+                        }
+
                         if ((check_car_s > car_s) && ((check_car_s - car_s) < 40))
                         {
                             //count_front_right += 1;
                             front_right_detected  = true;
                         }
                         
-                        if ((check_car_s < car_s) && ((car_s - check_car_s) < 15) && (check_speed < car_speed))
+                        if ((check_car_s < car_s) && ((car_s - check_car_s) < 6) && (check_speed < car_speed))
                         {
                             //count_behind_right += 1;
                             behind_right_detected = true;
@@ -354,6 +369,11 @@ int main() {
                 // Check LEFT Lane
                 if ((lane == 1) || (lane == 2))
                 {
+                        if ((check_car_s > car_s) && ((check_car_s - car_s) < 150))
+                        {
+                            count_front_left += 1;
+                        }
+
                     if ((d < (2 + 4*(lane - 1) + 2)) && (d > (2 + 4*(lane - 1) - 2)))
                     {
                         if ((check_car_s > car_s) && ((check_car_s - car_s) < 40))
@@ -362,7 +382,7 @@ int main() {
                             front_left_detected = true;
                         }
                         
-                        if ((check_car_s < car_s) && ((car_s - check_car_s) < 15) && (check_speed < car_speed))
+                        if ((check_car_s < car_s) && ((car_s - check_car_s) < 6) && (check_speed < car_speed))
                         {
                             //count_behind_left += 1;
                             behind_left_detected = true;
@@ -370,6 +390,41 @@ int main() {
                     }
                 }
             }
+
+            if (car_front_of_me)
+            {
+
+                double car_front_d = sensor_fusion[id_car_seek][6];
+                bool still_in_the_lane;
+
+                double car_front_s = sensor_fusion[id_car_seek][5];
+                double car_front_speed_vx = sensor_fusion[id_car_seek][3];
+                double car_front_speed_vy = sensor_fusion[id_car_seek][4];
+
+                double car_front_speed = sqrt(car_front_speed_vx*car_front_speed_vx + car_front_speed_vy*car_front_speed_vy);
+
+                car_front_s += ((double)prev_size*0.02*car_front_speed);
+                double car_front_distance = car_front_s - car_s;
+
+                // Check if the car in front me is still in the same lane
+                if((car_front_d < (2 + 4*lane + 2)) && (car_front_d > (2 + 4*lane - 2)))
+                    still_in_the_lane = true;
+                else
+                    still_in_the_lane = false;
+
+                if (car_front_of_me == true && car_front_distance > safe_distance && car_front_distance < (safe_distance+5) && still_in_the_lane == true)
+                    new_ref_vel = 2.23694*car_front_speed;
+                else   
+                    new_ref_vel = max_ref_vel;
+
+                //cout <<  " ref_vel:  " << new_ref_vel << endl;
+                cout <<  " ref_vel:  " << 2.23694*car_front_speed << endl;
+            }
+            else
+                new_ref_vel = max_ref_vel;
+
+
+
 
             //
             if ((front_right_detected == false) && (behind_right_detected == false))
@@ -385,48 +440,39 @@ int main() {
             // Print State
             cout <<  "\n\nCurrent State:  " << state << endl;
 
-            cout << "\n----------  Sensor Fusion -----------" << endl;
+            cout << "\n---------  Sensor Fusion ----------" << endl;
             cout << "LEFT Free:  " << left_lane_free <<  "       RIGHT Free:   " << right_lane_free << endl;
-
 
 /*
 
         FSM
 
 */
+            // State: Keep Lane
             if(state == "KP")
             {
                 count += 1;
                 if (too_close)
                 {
-                    /*
-                    target_car_s = sensor_fusion[id_car_seek][5];
-                    target_car_d = sensor_fusion[id_car_seek][6];
-                    //ref_vel = new_ref_vel;
-                    if((target_car_s - car_s > 20))
-                        ref_vel += 0.05;
-                    else
-                        ref_vel -= 0.2;
-                        */
-
-                    ref_vel -= 0.2;
-                    // Sensor Fusion
-                    /*
-                        Choose the lane with less cars in front of the ego vehicle
-                    */
-
+                    ref_vel -= max_acc;
                 }
-                else if(ref_vel < 49.5)
+                else if (ref_vel > new_ref_vel)
                 {
-                    ref_vel += 0.2;
+                    ref_vel -= acc;
+                }
+                else if(ref_vel < new_ref_vel)
+                {
+                    ref_vel += acc;
                 
                 }
 
-                if (count > 500)
+
+                if (count > 200)
                 {
                     
-                    if(lane == 1 && car_front_of_me == false)                    {
-
+                    if(lane == 1 && car_front_of_me == false) 
+                    {
+                        // Do nothing
                     }
                     else if(lane != 1) // return lane 1
                     {
@@ -444,26 +490,49 @@ int main() {
                             }
                             count = 0;
                     }
-                    //else if(change_lane)
-                    else
+                    else if(car_front_of_me == true)
                     {
-                        //if (count_front_left > count_front_left)
-                        if (right_lane_free == true)
+                        if (count_front_left > count_front_right)
                         {
-                            state = "PLCR";
-                            //change_lane = false;
-                            car_front_of_me = false;
-                            count = 0;
-                            attempt = 0;
+                            if (right_lane_free == true)
+                            {
+                                state = "PLCR";
+                                //change_lane = false;
+                                car_front_of_me = false;
+                                count = 0;
+                                attempt = 0;
 
+                            }
+                            else if(left_lane_free == true)
+                            {
+                                state = "PLCL";
+                                //change_lane = false;
+                                car_front_of_me = false;
+                                count = 0;
+                                attempt = 0;
+                            }
                         }
-                        else if(left_lane_free == true)
+                        else
                         {
-                            state = "PLCL";
-                            //change_lane = false;
-                            car_front_of_me = false;
-                            count = 0;
-                            attempt = 0;
+
+                            if(left_lane_free == true)
+                            {
+                                state = "PLCL";
+                                //change_lane = false;
+                                car_front_of_me = false;
+                                count = 0;
+                                attempt = 0;
+                            }
+                            else if (right_lane_free == true)
+                            {
+                                state = "PLCR";
+                                //change_lane = false;
+                                car_front_of_me = false;
+                                count = 0;
+                                attempt = 0;
+
+                            }
+
                         }
                     }
                 }
@@ -478,12 +547,12 @@ int main() {
                 count += 1;
                 if (too_close)
                 {
-                    ref_vel -= 0.224;
+                    ref_vel -= max_acc;
 
                 }
                 else if(ref_vel < 49.5)
                 {
-                    ref_vel += 0.224;
+                    ref_vel += acc;
                 }
 
                 // Sensor Fusion
@@ -518,18 +587,18 @@ int main() {
                 count += 1;
                 if (too_close)
                 {
-                    ref_vel -= 0.224;
+                    ref_vel -= max_acc;
 
                 }
-                else if(ref_vel < 49.5)
+                else if(ref_vel < max_ref_vel)
                 {
-                    ref_vel += 0.224;
+                    ref_vel += acc;
                 }
 
                 // Sensor Fusion
                 if (right_lane_free = true)
                 {
-                    if(count > 30)
+                    if(count > 50)
                     {
                         state = "LCR";
                         attempt = 0;
@@ -563,6 +632,7 @@ int main() {
                 }
 
                 state = "KP";
+                new_ref_vel = max_ref_vel;
             }
 /*
 
@@ -581,6 +651,7 @@ int main() {
                 }
 
                 state = "KP";
+                new_ref_vel = max_ref_vel;
             }
                 
 
@@ -630,9 +701,9 @@ int main() {
             }
 
             // In Frenet add evenly 30m spaced pointss ahead of the stating reference
-            vector<double> next_wp0 = getXY((car_s + 30), (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
-            vector<double> next_wp1 = getXY((car_s + 60), (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
-            vector<double> next_wp2 = getXY((car_s + 90), (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+            vector<double> next_wp0 = getXY((car_s + 26), (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+            vector<double> next_wp1 = getXY((car_s + 52), (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+            vector<double> next_wp2 = getXY((car_s + 78), (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
 
             // vector<double> next_wp3??
 
@@ -674,13 +745,13 @@ int main() {
 
 
             // Calculate how to break ap spline points so that we travel at our derired velocity
-            double target_x = 30.0; // CALCULATE BETTER VALUE
+            double target_x = 26.0; // CALCULATE BETTER VALUE
             double target_y = s(target_x);
             double target_dist = sqrt((target_x)*(target_x) + (target_y)*(target_y));
 
             double x_add_on = 0;
 
-            for(int i = 1; i <= (50 - previous_path_x.size()); i++)
+            for(int i = 1; i <= (POINTS - previous_path_x.size()); i++)
             {
                 double N = (target_dist/(0.02*ref_vel/2.24));
                 double x_point = x_add_on + (target_x)/N;
