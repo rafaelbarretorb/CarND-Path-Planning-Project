@@ -209,11 +209,11 @@ int main() {
 
     //start i lane 1;
     int lane = 1;
-    string state = "KP";
+    string state = "KL";
 
     // Reference velocity to target
     //double ref_vel = 48; // mph
-    double ref_vel = 1.0; // mph
+    double ref_vel = 0; // mph
     //double new_ref_vel = 49.5;
     //bool init = true;
     long int count = 0;
@@ -221,10 +221,10 @@ int main() {
 
     bool car_front_of_me = false;
     int attempt = 0;
-    const int POINTS = 35;
+    const int POINTS = 30;
     const double max_ref_vel = 49.5;
     const double max_acc = 0.4;
-    const double acc = 0.2;
+    const double acc = 0.25;
 
 
   h.onMessage([&acc, &max_acc, &max_ref_vel, &POINTS, &attempt, &car_front_of_me , &state, &count, &ref_vel,&lane, &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
@@ -252,7 +252,7 @@ int main() {
           	double car_s = j[1]["s"];
           	double car_d = j[1]["d"];
           	double car_yaw = j[1]["yaw"];
-          	double car_speed = j[1]["speed"]; // mph
+          	double car_speed = j[1]["speed"]; 
 
           	// Previous path data given to the Planner
           	auto previous_path_x = j[1]["previous_path_x"];
@@ -312,9 +312,13 @@ int main() {
             double safe_distance = 2 + car_speed/2.24; // 
             //cout << "\nsafe_distance" << safe_distance<< endl;
 
+/*
 
+        SENSOR FUSION SYSTEM
 
+*/
             //cout << "cars detected number:  " << sensor_fusion.size() << endl;
+
             for(int i = 0; i < sensor_fusion.size(); i++)
             {
                 double check_car_s = sensor_fusion[i][5];
@@ -325,6 +329,7 @@ int main() {
                 float d = sensor_fusion[i][6];
 
                 check_car_s += ((double)prev_size*0.02*check_speed);
+
 
                 // Check car in front of me
                 if ((d < (2 + 4*lane + 2)) && (d > (2 + 4*lane - 2)))
@@ -346,21 +351,22 @@ int main() {
                 {
                     if ((d < (2 + 4*(lane + 1) + 2)) && (d > (2 + 4*(lane + 1) - 2)))
                     {
-                        if ((check_car_s > car_s) && ((check_car_s - car_s) < 150))
-                        {
-                            count_front_right += 1;
-                        }
-
+                        // Check cars in front of
                         if ((check_car_s > car_s) && ((check_car_s - car_s) < 40))
                         {
-                            //count_front_right += 1;
                             front_right_detected  = true;
                         }
                         
+                        // Check cars behind
                         if ((check_car_s < car_s) && ((car_s - check_car_s) < 6) && (check_speed < car_speed))
                         {
-                            //count_behind_right += 1;
                             behind_right_detected = true;
+                        }
+
+                        // If lane = 1 count how many cars there are on the RIGHT lane in range 150 meters
+                        if ((check_car_s > car_s) && ((check_car_s - car_s) < 150))
+                        {
+                            count_front_right += 1;
                         }
                     }
 
@@ -369,23 +375,24 @@ int main() {
                 // Check LEFT Lane
                 if ((lane == 1) || (lane == 2))
                 {
-                        if ((check_car_s > car_s) && ((check_car_s - car_s) < 150))
-                        {
-                            count_front_left += 1;
-                        }
-
                     if ((d < (2 + 4*(lane - 1) + 2)) && (d > (2 + 4*(lane - 1) - 2)))
                     {
+                        // Check cars in front of
                         if ((check_car_s > car_s) && ((check_car_s - car_s) < 40))
                         {
-                            //count_front_left += 1;
                             front_left_detected = true;
                         }
                         
+                        // Check cars behind
                         if ((check_car_s < car_s) && ((car_s - check_car_s) < 6) && (check_speed < car_speed))
                         {
-                            //count_behind_left += 1;
                             behind_left_detected = true;
+                        }
+
+                        // If lane = 1 count how many cars there are on the LEFT lane in range 150 meters
+                        if ((lane == 1) && (check_car_s > car_s) && ((check_car_s - car_s) < 150))
+                        {
+                            count_front_left += 1;
                         }
                     }
                 }
@@ -427,15 +434,16 @@ int main() {
 
 
             //
-            if ((front_right_detected == false) && (behind_right_detected == false))
+            if (lane == 2)
+                right_lane_free = false;
+            else if ((front_right_detected == false) && (behind_right_detected == false)) 
                 right_lane_free = true;
 
-            if ((front_left_detected == false) && (behind_left_detected == false))
+            if (lane == 0)
+                left_lane_free == false;
+            else if ((front_left_detected == false) && (behind_left_detected == false))
                 left_lane_free = true;
                 
-
-            double target_car_s;
-            double target_car_d;
 
             // Print State
             cout <<  "\n\nCurrent State:  " << state << endl;
@@ -449,7 +457,7 @@ int main() {
 
 */
             // State: Keep Lane
-            if(state == "KP")
+            if(state == "KL")
             {
                 count += 1;
                 if (too_close)
@@ -466,15 +474,10 @@ int main() {
                 
                 }
 
-
+                // Avoid consecutives lane changes
                 if (count > 200)
                 {
-                    
-                    if(lane == 1 && car_front_of_me == false) 
-                    {
-                        // Do nothing
-                    }
-                    else if(lane != 1) // return lane 1
+                    if(lane != 1) // return lane 1
                     {
                             if (lane == 0 && right_lane_free == true)
                             {
@@ -574,7 +577,7 @@ int main() {
 
 
                 if (attempt > 2)
-                    state = "KP";
+                    state = "KL";
 
             }
 /*
@@ -612,7 +615,7 @@ int main() {
                 }
 
                 if (attempt > 2)
-                    state = "KP";
+                    state = "KL";
 
             }
 /*
@@ -631,8 +634,9 @@ int main() {
                     lane = 2;
                 }
 
-                state = "KP";
+                state = "KL";
                 new_ref_vel = max_ref_vel;
+                car_front_of_me == false;
             }
 /*
 
@@ -650,11 +654,16 @@ int main() {
                     lane = 1;
                 }
 
-                state = "KP";
+                state = "KL";
                 new_ref_vel = max_ref_vel;
+                car_front_of_me == false;
             }
-                
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////               
+/*
 
+    Project Walkthrough Video
+
+*/
 
             // Create a list of widely speced (x,y) waypoints, venly speced at 30m
             // Later we will interpolate these wayoints with a spline and fill ir with more points that control
@@ -700,12 +709,10 @@ int main() {
 
             }
 
-            // In Frenet add evenly 30m spaced pointss ahead of the stating reference
-            vector<double> next_wp0 = getXY((car_s + 26), (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
-            vector<double> next_wp1 = getXY((car_s + 52), (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
-            vector<double> next_wp2 = getXY((car_s + 78), (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
-
-            // vector<double> next_wp3??
+            // In Frenet add evenly 26m spaced points ahead of the stating reference
+            vector<double> next_wp0 = getXY((car_s + 30), (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+            vector<double> next_wp1 = getXY((car_s + 60), (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+            vector<double> next_wp2 = getXY((car_s + 90), (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
 
             ptsx.push_back(next_wp0[0]);
             ptsx.push_back(next_wp1[0]);
@@ -725,10 +732,6 @@ int main() {
                 ptsy[i] = (shift_x*sin(0 - ref_yaw) + shift_y*cos(0 - ref_yaw));
             }
 
-
-
-            // Define the a
-
             // create a spline
             tk::spline s;
 
@@ -744,20 +747,22 @@ int main() {
             }
 
 
-            // Calculate how to break ap spline points so that we travel at our derired velocity
-            double target_x = 26.0; // CALCULATE BETTER VALUE
+            // Calculate how to break up spline points so that we travel at our derired reference velocity
+            double target_x = 30.0; 
             double target_y = s(target_x);
             double target_dist = sqrt((target_x)*(target_x) + (target_y)*(target_y));
 
             double x_add_on = 0;
 
-            for(int i = 1; i <= (POINTS - previous_path_x.size()); i++)
+            //cout << prev_size << endl;
+
+            for(int i = 1; i <= (POINTS - previous_path_x.size()); i++) // previous_path_x.size() is (POINTS - 1)
             {
                 double N = (target_dist/(0.02*ref_vel/2.24));
                 double x_point = x_add_on + (target_x)/N;
                 double y_point = s(x_point);
 
-                            //set a new checkpoint
+                //set a new checkpoint
                 x_add_on = x_point;
                 
                 double x_ref = x_point;
@@ -774,9 +779,7 @@ int main() {
                 next_y_vals.push_back(y_point);
                 
             }
-            //*/
-    
-
+ ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////  
 
 
           	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
