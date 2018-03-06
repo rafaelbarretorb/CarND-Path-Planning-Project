@@ -390,6 +390,7 @@ int main() {
                 }
             }
 
+            // if there is a car in front of me
             if (car_front_of_me)
             {
 
@@ -411,13 +412,13 @@ int main() {
                 else
                     still_in_the_lane = false;
 
+                // Change my reference velocity and seek the car?
                 if (car_front_of_me == true && car_front_distance > safe_distance && car_front_distance < (safe_distance+5) && still_in_the_lane == true)
                     new_ref_vel = 2.23694*car_front_speed;
                 else   
                     new_ref_vel = max_ref_vel;
 
-                //cout <<  " ref_vel:  " << new_ref_vel << endl;
-                cout <<  " ref_vel:  " << 2.23694*car_front_speed << endl;
+                //cout <<  " ref_vel:  " << 2.23694*car_front_speed << endl;
             }
             else
                 new_ref_vel = max_ref_vel;
@@ -425,7 +426,7 @@ int main() {
 
 
 
-            //
+            // Free Lanes confirmation
             if (lane == 2)
                 right_lane_free = false;
             else if ((front_right_detected == false) && (behind_right_detected == false)) 
