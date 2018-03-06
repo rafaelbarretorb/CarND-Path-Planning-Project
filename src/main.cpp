@@ -281,13 +281,6 @@ int main() {
             }
 
             bool too_close = false;
-            bool seek_on = false;
-
-
-   
-            double past_d = 0;
-
-
 
             int id_car_seek;
 
@@ -300,7 +293,6 @@ int main() {
             bool behind_left_detected = false;
 
             double new_ref_vel;
-
 
             int count_front_right = 0;
             int count_front_left = 0;
